@@ -6,12 +6,14 @@ let connection = mysql.createConnection({
     host: "localhost",
     user: "root",
     password: "password",
-    port: 3306,
-    database: "employees_db"
+    database: "employees_db",
+    multipleStatements:"true"
 });
 
-connection.connect(function (err) {
-    console.log("inside connect");
+var myqry = require("util").promisify(connection.query).bind(connection);
+
+connection.connect(async function (err) {
+    //console.log("inside connect");
     if(err) throw err;
     console.log("Connection id: " + connection.threadId);
     init();
@@ -29,7 +31,8 @@ function init() {
             "Add Employee",
             "Remove Employee",
             "Update Employee Role",
-            "Update Employee Manager"
+            "Update Employee Manager",
+            "Quit"
         ]
     }).then(function(answer){
 
@@ -62,36 +65,51 @@ function init() {
         case "Update Employee Manager":
             updateEmployeeManager();
             break;
+
+        case "Quit":
+            quit();
+            break;
         }
 
 });
 }
 
 function allEmployees() {
-    
-    connection.query("select a.id, first_name, last_name, title, c.name as department, salary  from employee a left join role b on a.role_id = b.id left join department c on department_id = c.id;", 
-    
-    function(err, res){
+
+    let query = "select a.id, a.first_name, a.last_name, title, c.name as department, salary, concat(m.first_name, ' ', m.last_name) as manager";
+    query += " from employee a left join role b on a.role_id = b.id left join department c on department_id = c.id";
+    query += " left join employee m on a.manager_id = m.id;";
+
+    connection.query(query, function(err, res){
 
         if (err) throw err;
-        console.log("\n")
+        console.log("\n");
         console.table(res);
-        
-    init();
+        init();
     });
 
 }
 
-function employeeByDept() {
+async function allDepartments(){
+    res = await myqry("select name from department");
+    return res.map(d => d.name);
+}
+
+
+async function employeeByDept() {
+    
+    deptChoices = await allDepartments();
 
     inquirer.prompt({
-        name: "department",
-        type: "input",
-        message: "Enter Department name: "
 
-    }).then(function (res) {
+        name: "department",
+        type: "rawlist",
+        message: "Select Department: ",
+        choices: deptChoices
+
+    }).then(function(res) {
         
-    connection.query("select a.id, first_name, last_name, title, c.name as department, salary, m.first_name as m_first_name, m.last_name as m_last_name  from employee a left join role b on a.role_id = b.id left join department c on department_id = c.id left join employee m on a.manager_id = m.id;",  
+    connection.query("select a.id, a.first_name, a.last_name, title, c.name as department, salary, concat(m.first_name,' ',m.last_name) as manager from employee a left join role b on a.role_id = b.id left join department c on department_id = c.id left join employee m on a.manager_id = m.id where c.name = ?;",  
     
     [(res.department)], function(err, res){
 
@@ -104,32 +122,25 @@ function employeeByDept() {
 });
 }
 
-function removeEmployee() {
+async function removeEmployee() {
 
-    inquirer.prompt(
-        [{
-        name: "firstName",
-        type: "input",
-        message: "Enter first name: "
+    employees = await myqry("select concat(id, ' ', first_name, ' ', last_name) as emp from employee");
 
-    },
-    {
-        name: "lastName",
-        type: "input",
-        message: "Enter last name: " 
-    }]
+    inquirer.prompt({
+        name: "emp",
+        type: "list",
+        message: "Select Employee: ",
+        choices: employees.map(e => e.emp)
     
-    ).then(function (res) {
+    }).then(async function (res) {
+
+    let delete_id = res.emp.split(" ").shift();
+
+    await myqry("update employee set manager_id = null where manager_id = ?", delete_id);
+    await myqry("delete from employee where id = ?", delete_id);
         
-    connection.query("delete from employee where first_name = ? and last_name = ?", 
-    
-    [res.firstName, res.lastName], function(err, res){
-
-        if (err) throw err;
-        console.table(res);  
-        allEmployees();
-        init();
-    });
+    allEmployees();
+    init();
 
 });
 }
@@ -166,18 +177,25 @@ function addEmployee() {
     
     ).then(function (res) {
         
-    connection.query("delete from employee where first_name = ? and last_name = ?", 
+    // connection.query("insert into employee (first_name, last_name, role_id, manager_id) values (?, ?, ,  (select id from department where name= ?;) )  
     
-    [res.firstName, res.lastName], function(err, res){
+    // [res.firstName, res.lastName], function(err, res){
 
-        if (err) throw err;
-        console.table(res);  
-        allEmployees();
-        init();
-    });
+    //     if (err) throw err;
+    //     console.table(res);  
+    //     allEmployees();
+    //     init();
+    // });
 
 });
 }
+
+
+function quit() {
+    
+    console.log("Thank you!");        
+    connection.end();
+    };
 
 
 
