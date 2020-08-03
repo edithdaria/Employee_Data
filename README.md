@@ -39,5 +39,5 @@ If you have any questions don't hesitate to create an issue for this repository
 
 click below to view on YouTube
 
-![Demo](./assets/demo.gif)
+![Demo](https://www.youtube.com/watch?v=WaSNCN8NaZw&feature=youtu.be)
 
