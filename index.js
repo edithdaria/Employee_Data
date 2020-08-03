@@ -122,6 +122,41 @@ async function employeeByDept() {
 });
 }
 
+async function allManagers(){
+    res = await myqry("select concat(m.first_name,' ',m.last_name) as manager from employee a join employee m on a.manager_id = m.id;");
+    return res.map(d => d.manager);
+}
+
+
+async function employeeByManager() {
+    
+    managerChoices = await allManagers();
+
+    inquirer.prompt({
+
+        name: "manager",
+        type: "rawlist",
+        message: "Select Manager: ",
+        choices: managerChoices
+
+    }).then(function(res) {
+
+        let manager_first_name = res.manager.split(" ").shift();
+        let manager_last_name = res.manager.split(" ").pop();
+        
+    connection.query("select a.id, a.first_name, a.last_name, title, c.name as department, salary, concat(m.first_name,' ',m.last_name) as manager from employee a left join role b on a.role_id = b.id left join department c on department_id = c.id left join employee m on a.manager_id = m.id where m.first_name = ? and m.last_name = ?;",  
+    
+    [manager_first_name, manager_last_name], function(err, res){
+
+        if (err) throw err;
+        console.table(res);
+        
+    init();
+    });
+
+});
+}
+
 async function removeEmployee() {
 
     employees = await myqry("select concat(id, ' ', first_name, ' ', last_name) as emp from employee");
@@ -145,9 +180,9 @@ async function removeEmployee() {
 });
 }
 
-function addEmployee() {
+async function addEmployee() {
 
-    inquirer.prompt(
+    res = await inquirer.prompt(
         [{
         name: "firstName",
         type: "input",
@@ -161,33 +196,49 @@ function addEmployee() {
         message: "Enter last name: " 
     },
 
+
     {
-        name: "title",
-        type: "input",
-        message: "Enter the title: " 
+        name: "manager",
+        type: "rawlist",
+        message: "Select Manager: ",
+        choices: await allManagers()
     },
 
     {
-        name: "salary",
-        type: "input",
-        message: "Enter salary name: " 
+        name: "department",
+        type: "rawlist",
+        message: "Select Department: ",
+        choices: await allDepartments()
     }
 
 ]
-    
-    ).then(function (res) {
-        
-    // connection.query("insert into employee (first_name, last_name, role_id, manager_id) values (?, ?, ,  (select id from department where name= ?;) )  
-    
-    // [res.firstName, res.lastName], function(err, res){
+    );
 
-    //     if (err) throw err;
-    //     console.table(res);  
-    //     allEmployees();
-    //     init();
-    // });
+    res2 = await inquirer.prompt([ {
+        name: "role",
+        type: "rawlist",
+        message: "Select Manager: ",
+        choices: (await myqry("select concat(id, ' ', title) as role from role where department_id = \
+                    (select id from department where name = ?)", res.department)).map(t => t.role)
+    } ]); 
 
-});
+    let manager_first_name = res.manager.split(" ").shift();
+    let manager_last_name = res.manager.split(" ").pop();
+
+    console.log(manager_first_name);
+    console.log(manager_last_name);
+
+    manager_id = await myqry("select id from employee where first_name = ? and last_name = ?", 
+            [manager_first_name, manager_last_name]);
+
+    console.dir(res2.role);
+    
+    await myqry("insert into employee (first_name, last_name, role_id, manager_id) values " +
+            " (?, ?, ?, ? ) ", [res.firstName, res.lastName, res2.role.split(" ").shift(), manager_id.map(m => m.id)]);
+
+    allEmployees();
+    init();
+
 }
 
 
