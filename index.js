@@ -2,6 +2,8 @@ let inquirer = require("inquirer");
 let mysql = require("mysql");
 require("console.table");
 
+
+
 let connection = mysql.createConnection({
     host: "localhost",
     user: "root",
@@ -217,7 +219,7 @@ async function addEmployee() {
     res2 = await inquirer.prompt([ {
         name: "role",
         type: "rawlist",
-        message: "Select Manager: ",
+        message: "Select Role: ",
         choices: (await myqry("select concat(id, ' ', title) as role from role where department_id = \
                     (select id from department where name = ?)", res.department)).map(t => t.role)
     } ]); 
@@ -241,6 +243,35 @@ async function addEmployee() {
 
 }
 
+async function updateEmployeeManager() {
+
+    employees = await myqry("select concat(id, ' ', first_name, ' ', last_name) as emp from employee");
+
+    inquirer.prompt([{
+        name: "emp",
+        type: "list",
+        message: "Select Employee: ",
+        choices: employees.map(e => e.emp)
+    },
+    {
+        name: "manager",
+        type: "list",
+        message: "Select Employee: ",
+        choices: await allManagers()
+    
+    }]).then(async function (res) {
+
+    let update_id = res.emp.split(" ").shift();
+
+    await myqry("update employee set manager_id = null where manager_id = ?", update_id);
+
+        
+    allEmployees();
+    init();
+
+});
+}
+
 
 function quit() {
     
@@ -248,6 +279,42 @@ function quit() {
     connection.end();
     };
 
+
+    async function updateEmployeeRole() {
+
+        employees = await myqry("select concat(id, ' ', first_name, ' ', last_name) as emp from employee");
+    
+        inquirer.prompt([{
+            name: "emp",
+            type: "list",
+            message: "Select Employee: ",
+            choices: employees.map(e => e.emp)
+        },
+        {
+            name: "role",
+            type: "list",
+            message: "Select Role: ",
+        choices: (await myqry("select concat(id, ' ', title) as role from role")).map(t => t.role)
+        
+        }]).then(async function (res) {
+    
+        await myqry("update employee set role_id = ? where id = ?", 
+                [res.role.split(" ").shift(), res.emp.split(" ").shift()]);
+            
+        allEmployees();
+        init();
+    
+    });
+    }
+    
+    
+    function quit() {
+        
+        console.log("Thank you!");        
+        connection.end();
+        };
+    
+    
 
 
 
