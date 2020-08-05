@@ -7,8 +7,8 @@ require("console.table");
 let connection = mysql.createConnection({
     host: "localhost",
     user: "root",
-    database: "employees_db",
     password: "password",
+    database: "employees_db",
     multipleStatements:"true"
 });
 
@@ -201,3 +201,127 @@ async function addEmployee() {
 
     {
         name: "manager",
+        type: "rawlist",
+        message: "Select Manager: ",
+        choices: await allManagers()
+    },
+
+    {
+        name: "department",
+        type: "rawlist",
+        message: "Select Department: ",
+        choices: await allDepartments()
+    }
+
+]
+    );
+
+    res2 = await inquirer.prompt([ {
+        name: "role",
+        type: "rawlist",
+        message: "Select Role: ",
+        choices: (await myqry("select concat(id, ' ', title) as role from role where department_id = \
+                    (select id from department where name = ?)", res.department)).map(t => t.role)
+    } ]); 
+
+    let manager_first_name = res.manager.split(" ").shift();
+    let manager_last_name = res.manager.split(" ").pop();
+
+    console.log(manager_first_name);
+    console.log(manager_last_name);
+
+    let manager_id = await myqry("select id from employee where first_name = ? and last_name = ?", 
+            [manager_first_name, manager_last_name]);
+
+    console.dir(res2.role);
+    
+    await myqry("insert into employee (first_name, last_name, role_id, manager_id) values " +
+            " (?, ?, ?, ? ) ", [res.firstName, res.lastName, res2.role.split(" ").shift(), manager_id.map(m => m.id)]);
+
+    allEmployees();
+    init();
+
+}
+
+async function updateEmployeeManager() {
+
+    employees = await myqry("select concat(id, ' ', first_name, ' ', last_name) as emp from employee");
+
+    inquirer.prompt([{
+        name: "emp",
+        type: "list",
+        message: "Select Employee: ",
+        choices: employees.map(e => e.emp)
+    },
+    {
+        name: "manager",
+        type: "list",
+        message: "Select Employee: ",
+        choices: await allManagers()
+    
+    }]).then(async function (res) {
+
+    let manager_first_name = res.manager.split(" ").shift();
+    let manager_last_name = res.manager.split(" ").pop();
+
+    let manager_id = await myqry("select id from employee where first_name = ? and last_name = ?", 
+            [manager_first_name, manager_last_name]);
+
+    console.log(res.emp.split(" ").shift());
+    console.log(manager_id);
+
+    await myqry("update employee set manager_id = ? where id = ?", [manager_id.map(m => m.id), res.emp.split(" ").shift()]);
+        
+    allEmployees();
+    init();
+
+});
+}
+
+
+function quit() {
+    
+    console.log("Thank you!");        
+    connection.end();
+    };
+
+
+    async function updateEmployeeRole() {
+
+        employees = await myqry("select concat(id, ' ', first_name, ' ', last_name) as emp from employee");
+    
+        inquirer.prompt([{
+            name: "emp",
+            type: "list",
+            message: "Select Employee: ",
+            choices: employees.map(e => e.emp)
+        },
+        {
+            name: "role",
+            type: "list",
+            message: "Select Role: ",
+        choices: (await myqry("select concat(id, ' ', title) as role from role")).map(t => t.role)
+        
+        }]).then(async function (res) {
+    
+        await myqry("update employee set role_id = ? where id = ?", 
+                [res.role.split(" ").shift(), res.emp.split(" ").shift()]);
+            
+        allEmployees();
+        init();
+    
+    });
+    }
+    
+    
+    function quit() {
+        
+        console.log("Thank you!");        
+        connection.end();
+        };
+    
+    
+
+
+
+
